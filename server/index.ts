@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, join, normalize } from "node:path";
-import { SYSTEM_PROMPT, userPrompt } from "./prompt";
+import { SYSTEM_PROMPT, userPrompt } from "../src/model/prompt";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const MODEL = process.env.GENUS_MODEL ?? "claude-opus-5-5";

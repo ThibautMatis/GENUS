@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getApiKey, MODEL, NoAIError, setApiKey, streamReport } from "../ai";
 import { templateReport, type ReportFacts } from "../model/facts";
 
 interface Props {
@@ -36,6 +37,7 @@ export function ReportPanel({ facts }: Props) {
   const [showSettings, setShowSettings] = useState(false);
   const [showFacts, setShowFacts] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [apiKey, setKey] = useState(getApiKey());
   const abortRef = useRef<AbortController | null>(null);
   const factsJson = JSON.stringify(facts);
   const lastGenerated = useRef<string>("");
@@ -51,38 +53,27 @@ export function ReportPanel({ facts }: Props) {
       setError("");
       setEdited(false);
       try {
-        const res = await fetch("/api/report", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ facts: JSON.parse(factsJson), styleExample }),
-          signal: ctrl.signal,
-        });
-        if (res.status === 503 || res.status === 404 || res.status === 502) {
-          // Pas de clé API / serveur absent : CR par modèle de phrases
-          setOffline(true);
-          setText(templateReport(JSON.parse(factsJson)));
-          setStatus("idle");
-          return;
-        }
-        if (!res.ok || !res.body) throw new Error((await res.text()) || `Erreur ${res.status}`);
-        setOffline(false);
-        const reader = res.body.getReader();
-        const dec = new TextDecoder();
         let acc = "";
-        setText("");
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          acc += dec.decode(value, { stream: true });
+        let first = true;
+        for await (const chunk of streamReport(JSON.parse(factsJson), styleExample, ctrl.signal)) {
+          if (first) {
+            setOffline(false);
+            first = false;
+          }
+          acc += chunk;
           setText(acc);
         }
         setStatus("idle");
       } catch (e) {
-        if ((e as Error).name === "AbortError") return;
+        if ((e as Error).name === "AbortError" || ctrl.signal.aborted) return;
+        // Pas d'IA disponible : CR par modèle de phrases
         setOffline(true);
         setText(templateReport(JSON.parse(factsJson)));
-        setError(`Génération IA indisponible (${(e as Error).message}). CR généré par modèle de phrases.`);
-        setStatus("error");
+        if (e instanceof NoAIError) setStatus("idle");
+        else {
+          setError(`Génération IA indisponible (${(e as Error).message}). CR généré par modèle de phrases.`);
+          setStatus("error");
+        }
       }
     },
     [factsJson, styleExample, edited],
@@ -135,6 +126,22 @@ export function ReportPanel({ facts }: Props) {
       {showSettings && (
         <div className="settings">
           <label>
+            Clé API Anthropic (modèle {MODEL})
+            <input
+              type="password"
+              value={apiKey}
+              autoComplete="off"
+              placeholder="sk-ant-…"
+              onChange={(e) => {
+                setKey(e.target.value);
+                setApiKey(e.target.value);
+              }}
+            />
+            <span className="small">
+              Stockée uniquement dans ce navigateur, envoyée directement à Anthropic. Prototype : données fictives seulement.
+            </span>
+          </label>
+          <label>
             Exemple de CR (style à imiter, anonymisé)
             <textarea
               rows={6}
@@ -154,6 +161,12 @@ export function ReportPanel({ facts }: Props) {
       )}
 
       {error && <div className="error">{error}</div>}
+      {offline && !apiKey && !error && (
+        <div className="hint small">
+          Mode hors-ligne : CR par modèle de phrases. Pour la rédaction par IA, saisissez une clé API dans{" "}
+          <button className="link" onClick={() => setShowSettings(true)}>⚙ Réglages</button>.
+        </div>
+      )}
 
       <textarea
         className="report-text"

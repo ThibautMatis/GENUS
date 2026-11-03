@@ -138,3 +138,4 @@ input.details { font-size: 12px; }
 .facts { max-height: 240px; overflow: auto; font-size: 11px; background: #fff; border: 1px solid var(--line); padding: 6px; }
 .error { color: var(--danger); font-size: 12px; margin-bottom: 6px; }
 .footnote { margin-top: 6px; }
+.hint { background: var(--accent-soft); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; }

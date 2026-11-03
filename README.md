@@ -4,7 +4,18 @@ Outil web de consultation d'oncogénétique : le clinicien construit **l'arbre g
 
 > L'IA ne fait que **traduire l'arbre en texte** : pas d'estimation de risque, pas de recommandation, pas d'interprétation clinique.
 
-## Démarrage
+## Utiliser en ligne (GitHub Pages)
+
+Le site est publié automatiquement à chaque modification de `main` :
+**https://thibautmatis.github.io/GENUS/**
+
+Rien à installer : il suffit d'un navigateur. Pour la rédaction par IA, saisir une clé API Anthropic dans ⚙ (panneau Compte rendu). La clé est stockée uniquement dans ce navigateur et envoyée directement à Anthropic. Sans clé, le CR est produit par des modèles de phrases.
+
+> Mode prototype : **données fictives uniquement**. Ne pas partager la clé ; la révoquer sur console.anthropic.com en cas de doute.
+
+Mise en place (une seule fois) : dans le dépôt GitHub, *Settings → Pages → Build and deployment → Source : GitHub Actions*.
+
+## Démarrage en local
 
 Prérequis : Node.js ≥ 20.6
 
@@ -42,9 +53,10 @@ src/
   model/facts.ts       données pseudonymisées envoyées à l'IA + CR hors-ligne
   layout.ts            placement automatique de l'arbre (générations, fratries, couples)
   components/          PedigreeView (SVG), PersonPanel (saisie), ReportPanel (CR)
+  model/prompt.ts      consignes de rédaction du CR
+  ai.ts                appel à Claude en streaming (clé dans le navigateur, ou via le serveur local)
 server/
-  index.ts             API /api/report : appel à Claude en streaming
-  prompt.ts            consignes de rédaction du CR
+  index.ts             serveur local optionnel : /api/report avec la clé du fichier .env
 ```
 
 Le principe : **l'arbre est un JSON structuré**, les liens de parenté sont calculés par le code (pas par l'IA), et seules des données pseudonymisées (lien de parenté, sexe, âges, antécédents) sont envoyées au modèle. Les prénoms/repères saisis ne quittent jamais le navigateur.
