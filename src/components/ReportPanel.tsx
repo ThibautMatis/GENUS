@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getApiKey, MODEL, NoAIError, setApiKey, streamReport } from "../ai";
-import { templateReport, type ReportFacts } from "../model/facts";
+import type { ReportFacts } from "../model/facts";
 
 interface Props {
   facts: ReportFacts;
+  /** CR rédigé par modèles de phrases, utilisé sans IA */
+  offlineReport: string;
 }
 
 type Status = "idle" | "generating" | "error";
@@ -26,7 +28,9 @@ function save(key: string, value: string) {
   }
 }
 
-export function ReportPanel({ facts }: Props) {
+export function ReportPanel({ facts, offlineReport }: Props) {
+  const offlineRef = useRef(offlineReport);
+  offlineRef.current = offlineReport;
   const [text, setText] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
@@ -68,7 +72,7 @@ export function ReportPanel({ facts }: Props) {
         if ((e as Error).name === "AbortError" || ctrl.signal.aborted) return;
         // Pas d'IA disponible : CR par modèle de phrases
         setOffline(true);
-        setText(templateReport(JSON.parse(factsJson)));
+        setText(offlineRef.current);
         if (e instanceof NoAIError) setStatus("idle");
         else {
           setError(`Génération IA indisponible (${(e as Error).message}). CR généré par modèle de phrases.`);

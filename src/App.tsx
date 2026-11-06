@@ -9,6 +9,7 @@ import { labelLines } from "./treeLabels";
 import { CANCER_SITES } from "./model/cancers";
 import { demoPedigree } from "./model/demo";
 import { buildFacts } from "./model/facts";
+import { templateReport } from "./model/sentences";
 import {
   addChild,
   addHalfSibling,
@@ -101,6 +102,7 @@ export default function App() {
 
   const relations = useMemo(() => computeRelations(pedigree), [pedigree]);
   const facts = useMemo(() => buildFacts(pedigree), [pedigree]);
+  const offlineReport = useMemo(() => templateReport(pedigree), [pedigree]);
   const selected = selectedId ? pedigree.persons[selectedId] : undefined;
 
   // Les frappes successives dans un même champ sont regroupées dans une seule étape d'annulation
@@ -269,7 +271,7 @@ export default function App() {
           </div>
           {/* Les deux onglets restent montés pour conserver leur état */}
           <div className="tab-body" hidden={tab !== "report"}>
-            <ReportPanel facts={facts} />
+            <ReportPanel facts={facts} offlineReport={offlineReport} />
           </div>
           <div className="tab-body" hidden={tab !== "risk"}>
             <RiskPanel

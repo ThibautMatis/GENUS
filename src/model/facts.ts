@@ -35,7 +35,7 @@ const BRANCH_ORDER: Branch[] = [
   "autre",
 ];
 
-function branchOf(p: Pedigree, id: string, rels: Record<string, Relation>, depth = 0): Branch {
+export function branchOf(p: Pedigree, id: string, rels: Record<string, Relation>, depth = 0): Branch {
   const r = rels[id];
   if (id === p.probandId) return "cas index";
   if (r.blood && /^(demi-)?(frère|sœur|membre de la fratrie)/.test(r.label)) return "fratrie";
@@ -113,28 +113,4 @@ export function buildFacts(p: Pedigree): ReportFacts {
     proband: toFact(p.persons[p.probandId]),
     relatives,
   };
-}
-
-/** CR "hors-ligne" sans IA : phrases simples générées par modèle. Sert de secours et de démo. */
-export function templateReport(f: ReportFacts): string {
-  const line = (x: PersonFact) => {
-    const cap = x.relation.charAt(0).toUpperCase() + x.relation.slice(1);
-    const parts = [`${cap} (${x.status})`];
-    parts.push(x.cancers.length ? `cancer : ${x.cancers.join(" ; ")}` : "pas d'antécédent de cancer rapporté");
-    if (x.tests.length) parts.push(`analyse génétique : ${x.tests.join(" ; ")}`);
-    if (x.notes) parts.push(x.notes);
-    return `- ${parts.join(" – ")}.`;
-  };
-  const out: string[] = [];
-  out.push("HISTOIRE FAMILIALE");
-  if (f.consultation.indication) out.push(`Motif de consultation : ${f.consultation.indication}.`);
-  if (f.consultation.origins) out.push(`Origines : ${f.consultation.origins}.`);
-  out.push("", "Cas index", line(f.proband));
-  for (const b of BRANCH_ORDER.slice(1)) {
-    const xs = f.relatives.filter((r) => r.branch === b);
-    if (!xs.length) continue;
-    out.push("", b.charAt(0).toUpperCase() + b.slice(1));
-    out.push(...xs.map(line));
-  }
-  return out.join("\n");
 }
