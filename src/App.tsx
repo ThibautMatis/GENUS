@@ -5,6 +5,7 @@ import { ReportPanel } from "./components/ReportPanel";
 import { PatientInfoModal } from "./components/PatientInfoModal";
 import { RiskPanel } from "./components/RiskPanel";
 import { layout } from "./layout";
+import { labelLines } from "./treeLabels";
 import { CANCER_SITES } from "./model/cancers";
 import { demoPedigree } from "./model/demo";
 import { buildFacts } from "./model/facts";
@@ -43,7 +44,14 @@ export default function App() {
   const [infoId, setInfoId] = useState<string | undefined>();
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const laid = useMemo(() => layout(pedigree), [pedigree]);
+  const [showDetails, setShowDetails] = useState(() => {
+    try {
+      return localStorage.getItem("genus.showDetails") !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const laid = useMemo(() => layout(pedigree, (p) => labelLines(p, showDetails).length), [pedigree, showDetails]);
   const fit = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -209,9 +217,24 @@ export default function App() {
             <span>{Math.round(zoom * 100)} %</span>
             <button onClick={() => setZoom((z) => Math.min(2, z + 0.1))}>+</button>
             <button onClick={fit}>Ajuster</button>
+            <label className="check small" title="Afficher sous les symboles le type des cancers et les notes">
+              <input
+                type="checkbox"
+                checked={showDetails}
+                onChange={(e) => {
+                  setShowDetails(e.target.checked);
+                  try {
+                    localStorage.setItem("genus.showDetails", e.target.checked ? "1" : "0");
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+              />
+              Précisions
+            </label>
           </div>
           <div className="tree-scroll" ref={scrollRef}>
-            <PedigreeView pedigree={pedigree} selectedId={selectedId} onSelect={setSelectedId} zoom={zoom} laid={laid} />
+            <PedigreeView pedigree={pedigree} selectedId={selectedId} onSelect={setSelectedId} zoom={zoom} laid={laid} showDetails={showDetails} />
           </div>
           <div className="legend">
             {CANCER_SITES.filter((s) => Object.values(pedigree.persons).some((p) => p.cancers.some((c) => c.site === s.key))).map((s) => (

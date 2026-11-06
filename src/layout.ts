@@ -5,6 +5,8 @@ import type { Pedigree, Person } from "./model/types";
 export const NODE = 40;
 export const UNIT = 120;
 export const GEN_H = 190;
+/** Interligne des textes sous les symboles */
+export const LINE_H = 14;
 const GAP = 40;
 
 export interface LaidOut {
@@ -77,7 +79,11 @@ function pack(targets: number[], seps: number[]): number[] {
   return out.map((v, i) => v + offset[i]);
 }
 
-export function layout(p: Pedigree): LaidOut {
+/**
+ * @param lineCount nombre de lignes de texte sous chaque personne : l'espace entre
+ * générations s'agrandit si besoin pour que les textes ne chevauchent pas les traits.
+ */
+export function layout(p: Pedigree, lineCount: (person: Person) => number = () => 3): LaidOut {
   const gen = generations(p);
   const rels = computeRelations(p);
   const persons = Object.values(p.persons).filter((x) => x.id in gen);
@@ -235,10 +241,19 @@ export function layout(p: Pedigree): LaidOut {
   const maxX = Math.max(...xs);
   const margin = UNIT;
   const pos: LaidOut["pos"] = {};
-  for (const id in x) pos[id] = { x: x[id] - minX + margin, y: gen[id] * GEN_H + 90 };
+  // Hauteur de chaque génération selon le texte le plus long qu'elle contient
+  const maxGen = gens.length ? Math.max(...gens) : 0;
+  const rowH: number[] = [];
+  for (let g = 0; g <= maxGen; g++) {
+    const lines = Math.max(0, ...persons.filter((q) => gen[q.id] === g).map((q) => lineCount(q)));
+    rowH[g] = Math.max(GEN_H, 2 * NODE + 72 + (lines - 1) * LINE_H);
+  }
+  const rowY: number[] = [90];
+  for (let g = 1; g <= maxGen + 1; g++) rowY[g] = rowY[g - 1] + rowH[g - 1];
+  for (const id in x) pos[id] = { x: x[id] - minX + margin, y: rowY[gen[id]] };
   return {
     pos,
     width: maxX - minX + 2 * margin,
-    height: (gens.length ? Math.max(...gens) + 1 : 1) * GEN_H + 60,
+    height: rowY[maxGen + 1] - 30,
   };
 }

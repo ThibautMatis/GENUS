@@ -1,5 +1,6 @@
-import { NODE, type LaidOut } from "../layout";
-import { cancerColor, cancerLabel } from "../model/cancers";
+import { LINE_H, NODE, type LaidOut } from "../layout";
+import { labelLines } from "../treeLabels";
+import { cancerColor } from "../model/cancers";
 import { childrenOfCouple } from "../model/ops";
 import type { Pedigree, Person } from "../model/types";
 
@@ -9,6 +10,8 @@ interface Props {
   onSelect: (id: string | undefined) => void;
   zoom: number;
   laid: LaidOut;
+  /** Afficher sur l'arbre les précisions des cancers et les notes */
+  showDetails: boolean;
 }
 
 const R = NODE / 2;
@@ -52,22 +55,7 @@ function Sectors({ person, clipId }: { person: Person; clipId: string }) {
   );
 }
 
-function labelLines(person: Person): { text: string; color?: string; bold?: boolean }[] {
-  const lines: { text: string; color?: string; bold?: boolean }[] = [];
-  if (person.label) lines.push({ text: person.label, color: "var(--muted)" });
-  if (person.deceased) lines.push({ text: `† ${person.ageAtDeath != null ? person.ageAtDeath + " a" : ""}`.trim() });
-  else if (person.age != null) lines.push({ text: `${person.age} a` });
-  else if (person.birthYear) lines.push({ text: `n. ${person.birthYear}` });
-  for (const c of person.cancers)
-    lines.push({ text: `${cancerLabel(c.site)}${c.ageAtDiagnosis != null ? " " + c.ageAtDiagnosis : ""}`, color: cancerColor(c.site), bold: true });
-  for (const t of person.tests) {
-    const sign = t.result === "pathogène" || t.result === "probablement pathogène" ? "+" : t.result === "négatif" ? "−" : t.result === "VSI" ? " VSI" : " ?";
-    lines.push({ text: `${t.gene}${sign}`, bold: sign === "+" });
-  }
-  return lines;
-}
-
-export function PedigreeView({ pedigree, selectedId, onSelect, zoom, laid }: Props) {
+export function PedigreeView({ pedigree, selectedId, onSelect, zoom, laid, showDetails }: Props) {
   const { pos, width, height } = laid;
   const persons = Object.values(pedigree.persons).filter((p) => pos[p.id]);
 
@@ -159,8 +147,16 @@ export function PedigreeView({ pedigree, selectedId, onSelect, zoom, laid }: Pro
             )}
             {person.unknownHistory && <text x={R + 6} y={-R + 4} className="unknown">?</text>}
             <text y={R + 18} className="node-label">
-              {labelLines(person).map((l, i) => (
-                <tspan key={i} x={0} dy={i === 0 ? 0 : 14} fill={l.color} fontWeight={l.bold ? 600 : 400}>
+              {labelLines(person, showDetails).map((l, i) => (
+                <tspan
+                  key={i}
+                  x={0}
+                  dy={i === 0 ? 0 : LINE_H}
+                  fill={l.color}
+                  fontWeight={l.bold ? 600 : 400}
+                  fontSize={l.small ? 10.5 : undefined}
+                  fontStyle={l.small ? "italic" : undefined}
+                >
                   {l.text}
                 </tspan>
               ))}
