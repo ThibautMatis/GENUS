@@ -1,0 +1,5 @@
+# Configuration Cloudflare Pages (hébergement en ligne de GENUS)
+name = "genus"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]

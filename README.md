@@ -4,16 +4,28 @@ Outil web de consultation d'oncogénétique : le clinicien construit **l'arbre g
 
 > L'IA ne fait que **traduire l'arbre en texte** : pas d'estimation de risque, pas de recommandation, pas d'interprétation clinique.
 
-## Utiliser en ligne (GitHub Pages)
+## Mettre GENUS en ligne (Cloudflare Pages, accès protégé)
 
-Le site est publié automatiquement à chaque modification de `main` :
-**https://thibautmatis.github.io/GENUS/**
+GENUS est hébergé gratuitement sur **Cloudflare Pages**, qui sert la page web **et** le petit serveur (dossier `functions/`) nécessaire à l'IA et à CanRisk. Tout le site est protégé par un mot de passe (`GENUS_PASSWORD`). Le dépôt GitHub peut rester privé.
 
-Rien à installer : il suffit d'un navigateur. Pour la rédaction par IA, saisir une clé API Anthropic dans ⚙ (panneau Compte rendu). La clé est stockée uniquement dans ce navigateur et envoyée directement à Anthropic. Sans clé, le CR est produit par des modèles de phrases.
+Mise en place (une seule fois) :
 
-> Mode prototype : **données fictives uniquement**. Ne pas partager la clé ; la révoquer sur console.anthropic.com en cas de doute.
+1. Créer un compte gratuit sur https://dash.cloudflare.com
+2. **Workers & Pages → Créer → Pages → Importer un dépôt Git** : relier GitHub et choisir le dépôt GENUS.
+3. Paramètres de build :
+   - *Framework preset* : aucun (ou Vite)
+   - *Build command* : `npm run build`
+   - *Build output directory* : `dist`
+4. **Variables et secrets** (type « Secret ») :
+   - `GENUS_PASSWORD` : le mot de passe d'accès au site, à communiquer aux testeurs
+   - `ANTHROPIC_API_KEY` : clé API Anthropic pour la rédaction du CR (facultatif)
+5. **Enregistrer et déployer**. Le site est disponible à une adresse du type `https://genus-xxx.pages.dev`.
 
-Mise en place (une seule fois) : dans le dépôt GitHub, *Settings → Pages → Build and deployment → Source : GitHub Actions*.
+Ensuite, chaque modification envoyée sur GitHub (`main`) met le site à jour automatiquement.
+
+À l'ouverture, le navigateur demande un identifiant (n'importe lequel) et le mot de passe. Chaque utilisateur se connecte ensuite à CanRisk avec son propre compte, depuis l'onglet « Risque CanRisk ».
+
+Pour tester la version Cloudflare sur son ordinateur : `npm run cloudflare:local` (variables dans un fichier `.dev.vars`).
 
 ## Démarrage en local
 
@@ -57,7 +69,7 @@ risque cumulé de 20 à 80 ans, risque entre 40 et 50 ans, risque à partir de l
 
 Optionnel, pour un poste de test : un compte unique peut être configuré côté serveur dans `.env` (`CANRISK_USERNAME` / `CANRISK_PASSWORD`) ; la connexion n'est alors plus demandée.
 
-Le calcul nécessite le **serveur GENUS** (`npm run dev` ou `npm start`) : l'API CanRisk n'accepte pas les appels directs depuis un navigateur (pas de CORS), donc il n'est pas disponible sur la version GitHub Pages.
+Le calcul passe par le serveur GENUS (en ligne sur Cloudflare, ou `npm run dev` en local) : l'API CanRisk n'accepte pas les appels directs depuis un navigateur.
 
 Derrière un proxy d'entreprise, lancer le serveur avec `NODE_USE_ENV_PROXY=1` et `HTTPS_PROXY=http://proxy:port`.
 
@@ -75,7 +87,9 @@ src/
   model/canrisk.ts     conversion de l'arbre au format CanRisk v4 + types des résultats
   ai.ts                appel à Claude en streaming (clé dans le navigateur, ou via le serveur local)
 server/
-  index.ts             serveur : /api/report (IA) et /api/canrisk (relais vers CanRisk)
+  handlers.ts          logique serveur : IA, relais CanRisk, mot de passe du site
+  index.ts             serveur local (Node.js)
+functions/             la même logique, branchée sur Cloudflare Pages
 ```
 
 Le principe : **l'arbre est un JSON structuré**, les liens de parenté sont calculés par le code (pas par l'IA), et seules des données pseudonymisées (lien de parenté, sexe, âges, antécédents) sont envoyées au modèle. Les prénoms/repères saisis ne quittent jamais le navigateur.
