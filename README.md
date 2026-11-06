@@ -43,6 +43,27 @@ npm start                 # http://localhost:8787
 - ⚙ : coller un **exemple de CR anonymisé** pour que l'IA en reprenne la structure et le ton ; voir les données exactement transmises à l'IA.
 - Annuler (Ctrl+Z), Exporter / Importer l'arbre en JSON, famille de démonstration (fictive).
 
+## Calcul de risque CanRisk (BOADICEA)
+
+L'onglet **Risque CanRisk** envoie l'arbre au service de calcul officiel de CanRisk (canrisk.org) et affiche :
+risque cumulé de 20 à 80 ans, risque entre 40 et 50 ans, risque à partir de l'âge actuel (comparés à la population générale), et probabilité d'être porteur d'un variant (BRCA1, BRCA2, PALB2…). Modèles : sein (BOADICEA), ovaire, prostate.
+
+- Le calcul se fait **sur les serveurs de CanRisk**. GENUS ne fait que convertir l'arbre au format « CanRisk Pedigree Data v4 », sans aucun nom.
+- Données utilisées : sexe, âges, décès, cancers du sein (et controlatéral), ovaire, prostate, pancréas avec âge au diagnostic, origine ashkénaze, tests génétiques (BRCA1, BRCA2, PALB2, ATM, CHEK2, BARD1, RAD51C, RAD51D, BRIP1, HOXB13), récepteurs RE/RP/HER2, et les facteurs de risque optionnels de la personne cible.
+- Bouton « Fichier CanRisk » : le même fichier, importable dans l'outil web canrisk.org pour contrôle.
+- Bouton « Copier pour le CR » : résumé des résultats à coller dans le compte rendu.
+
+**Configuration** (dans `.env`) : un compte sur https://www.canrisk.org, avec accès aux web-services.
+
+```
+CANRISK_USERNAME=...
+CANRISK_PASSWORD=...
+```
+
+Le calcul nécessite le **serveur GENUS** (`npm run dev` ou `npm start`) : l'API CanRisk n'accepte pas les appels directs depuis un navigateur (pas de CORS), donc il n'est pas disponible sur la version GitHub Pages.
+
+Derrière un proxy d'entreprise, lancer le serveur avec `NODE_USE_ENV_PROXY=1` et `HTTPS_PROXY=http://proxy:port`.
+
 ## Architecture
 
 ```
@@ -54,9 +75,10 @@ src/
   layout.ts            placement automatique de l'arbre (générations, fratries, couples)
   components/          PedigreeView (SVG), PersonPanel (saisie), ReportPanel (CR)
   model/prompt.ts      consignes de rédaction du CR
+  model/canrisk.ts     conversion de l'arbre au format CanRisk v4 + types des résultats
   ai.ts                appel à Claude en streaming (clé dans le navigateur, ou via le serveur local)
 server/
-  index.ts             serveur local optionnel : /api/report avec la clé du fichier .env
+  index.ts             serveur : /api/report (IA) et /api/canrisk (relais vers CanRisk)
 ```
 
 Le principe : **l'arbre est un JSON structuré**, les liens de parenté sont calculés par le code (pas par l'IA), et seules des données pseudonymisées (lien de parenté, sexe, âges, antécédents) sont envoyées au modèle. Les prénoms/repères saisis ne quittent jamais le navigateur.
@@ -73,6 +95,6 @@ Ce prototype est destiné à être testé **avec des familles fictives**. Avant 
 ## Pistes
 
 - Export de l'arbre en image/PDF pour le dossier patient.
-- Import/export au format CanRisk (pedigree BOADICEA).
+- Import d'un fichier CanRisk existant.
 - Régénération d'une seule section du CR.
 - Symboles complémentaires (jumeaux, grossesses, consanguinité dans l'interface).

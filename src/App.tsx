@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PedigreeView } from "./components/PedigreeView";
 import { PersonPanel, type Action } from "./components/PersonPanel";
 import { ReportPanel } from "./components/ReportPanel";
+import { RiskPanel } from "./components/RiskPanel";
 import { layout } from "./layout";
 import { CANCER_SITES } from "./model/cancers";
 import { demoPedigree } from "./model/demo";
@@ -37,6 +38,7 @@ export default function App() {
   const [history, setHistory] = useState<Pedigree[]>([]);
   const [selectedId, setSelectedId] = useState<string | undefined>(() => pedigree.probandId);
   const [zoom, setZoom] = useState(1);
+  const [tab, setTab] = useState<"report" | "risk">("report");
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const laid = useMemo(() => layout(pedigree), [pedigree]);
@@ -235,7 +237,21 @@ export default function App() {
         </aside>
 
         <aside className="report">
-          <ReportPanel facts={facts} />
+          <div className="tabs">
+            <button className={tab === "report" ? "active" : ""} onClick={() => setTab("report")}>Compte rendu</button>
+            <button className={tab === "risk" ? "active" : ""} onClick={() => setTab("risk")}>Risque CanRisk</button>
+          </div>
+          {/* Les deux onglets restent montés pour conserver leur état */}
+          <div className="tab-body" hidden={tab !== "report"}>
+            <ReportPanel facts={facts} />
+          </div>
+          <div className="tab-body" hidden={tab !== "risk"}>
+            <RiskPanel
+              pedigree={pedigree}
+              relations={relations}
+              onUpdatePerson={(id, patch) => commit(updatePerson(pedigree, id, patch), true)}
+            />
+          </div>
         </aside>
       </main>
     </div>

@@ -7,6 +7,10 @@ export interface Cancer {
   ageAtDiagnosis?: number;
   /** Précision libre : histologie, latéralité, récepteurs… */
   details?: string;
+  /** Sein : cancer controlatéral (2e cancer du sein) */
+  contralateral?: boolean;
+  /** Sein : statut des récepteurs, utilisé par CanRisk */
+  pathology?: Partial<Record<"ER" | "PR" | "HER2" | "CK14" | "CK56", "P" | "N">>;
 }
 
 export type TestResult = "pathogène" | "probablement pathogène" | "VSI" | "négatif" | "en cours";
@@ -18,6 +22,8 @@ export interface GeneticTest {
   result: TestResult;
   variant?: string;
   year?: number;
+  /** Test ciblé d'un variant familial (sinon : analyse complète du gène) */
+  targeted?: boolean;
 }
 
 export interface Person {
@@ -43,6 +49,27 @@ export interface Person {
   adopted?: boolean;
   /** Infos non connues du patient */
   unknownHistory?: boolean;
+  ashkenazi?: boolean;
+  /** Facteurs de risque (utilisés par CanRisk quand la personne est la cible du calcul) */
+  riskFactors?: RiskFactors;
+}
+
+export interface RiskFactors {
+  menarche?: number;
+  parity?: number;
+  firstLiveBirth?: number;
+  /** N = jamais, F:années = ancienne, C:années = actuelle */
+  ocUse?: string;
+  /** N, F, E, C (cf. format CanRisk) */
+  mhtUse?: "N" | "F" | "E" | "C";
+  bmi?: number;
+  alcohol?: number;
+  /** âge, ou "N" si non ménopausée */
+  menopause?: string;
+  birads?: "a" | "b" | "c" | "d";
+  height?: number;
+  tubalLigation?: "Y" | "N";
+  endometriosis?: "Y" | "N";
 }
 
 export interface Couple {

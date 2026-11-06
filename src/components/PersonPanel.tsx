@@ -138,6 +138,27 @@ export function PersonPanel({ person, relation, isProband, onChange, onAction }:
               value={c.details ?? ""}
               onChange={(e) => setCancer(i, { details: e.target.value })}
             />
+            {c.site === "sein" && (
+              <div className="pathology">
+                {(["ER", "PR", "HER2"] as const).map((k) => (
+                  <label key={k} className="inline-select">
+                    {k === "ER" ? "RE" : k === "PR" ? "RP" : "HER2"}
+                    <select
+                      value={c.pathology?.[k] ?? ""}
+                      onChange={(e) => setCancer(i, { pathology: { ...c.pathology, [k]: (e.target.value || undefined) as "P" | "N" | undefined } })}
+                    >
+                      <option value="">?</option>
+                      <option value="P">+</option>
+                      <option value="N">−</option>
+                    </select>
+                  </label>
+                ))}
+                <label className="check small">
+                  <input type="checkbox" checked={!!c.contralateral} onChange={(e) => setCancer(i, { contralateral: e.target.checked })} />
+                  Controlatéral
+                </label>
+              </div>
+            )}
           </div>
         ))}
         <div className="quick-sites">
@@ -178,6 +199,10 @@ export function PersonPanel({ person, relation, isProband, onChange, onAction }:
               <input className="details" placeholder="Variant (HGVS)" value={t.variant ?? ""} onChange={(e) => setTest(i, { variant: e.target.value })} />
               <input className="details narrow" type="number" placeholder="Année" value={t.year ?? ""} onChange={(e) => setTest(i, { year: num(e.target.value) })} />
             </div>
+            <label className="check small">
+              <input type="checkbox" checked={!!t.targeted} onChange={(e) => setTest(i, { targeted: e.target.checked })} />
+              Test ciblé du variant familial
+            </label>
           </div>
         ))}
         <button className="chip" onClick={() => onChange({ tests: [...person.tests, { id: uid(), gene: "", result: "en cours" }] })}>+ Analyse</button>
@@ -188,6 +213,10 @@ export function PersonPanel({ person, relation, isProband, onChange, onAction }:
         <label className="check">
           <input type="checkbox" checked={!!person.unknownHistory} onChange={(e) => onChange({ unknownHistory: e.target.checked })} />
           Antécédents inconnus du consultant
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={!!person.ashkenazi} onChange={(e) => onChange({ ashkenazi: e.target.checked })} />
+          Origine juive ashkénaze
         </label>
         <label className="check">
           <input type="checkbox" checked={!!person.adopted} onChange={(e) => onChange({ adopted: e.target.checked })} />

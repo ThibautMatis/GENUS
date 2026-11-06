@@ -124,6 +124,9 @@ input.details { font-size: 12px; }
 .chip { font-size: 12px; padding: 2px 8px; border-radius: 12px; }
 
 .report-panel { display: flex; flex-direction: column; height: 100%; }
+.report { display: flex; flex-direction: column; }
+.tab-body { flex: 1; min-height: 0; overflow: auto; }
+.tab-body[hidden] { display: none; }
 .report-toolbar { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
 .report-toolbar .spacer { flex: 1; }
 .report-toolbar label.check { margin: 0; }
@@ -139,3 +142,26 @@ input.details { font-size: 12px; }
 .error { color: var(--danger); font-size: 12px; margin-bottom: 6px; }
 .footnote { margin-top: 6px; }
 .hint { background: var(--accent-soft); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; }
+
+.tabs { display: flex; gap: 2px; padding: 8px 14px 0; border-bottom: 1px solid var(--line); }
+.tabs button { border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 6px 10px; color: var(--muted); }
+.tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+button.primary:hover:not(:disabled) { color: #fff; filter: brightness(1.1); }
+.pathology { display: flex; gap: 8px; align-items: center; margin-top: 4px; flex-wrap: wrap; }
+.inline-select { flex-direction: row; align-items: center; gap: 4px; margin: 0; }
+.inline-select select { width: auto; padding: 2px 4px; }
+.risk-panel .row { flex-wrap: wrap; }
+.rf { margin: 6px 0 10px; }
+.rf summary { cursor: pointer; color: var(--accent); }
+.rf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; margin-top: 8px; }
+ul.error, ul.small { margin: 6px 0; padding-left: 18px; }
+.results { margin-top: 10px; }
+.results.stale .risk-table, .results.stale .carriers { opacity: 0.45; }
+.risk-block { margin-bottom: 12px; }
+.risk-title { font-weight: 600; margin-bottom: 4px; }
+.risk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.risk-table th, .risk-table td { text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--line); }
+.risk-table th { color: var(--muted); font-weight: 500; }
+.carriers { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.file-preview { margin-top: 10px; }

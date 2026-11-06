@@ -87,6 +87,79 @@ async function handleReport(req: IncomingMessage, res: ServerResponse) {
   }
 }
 
+/* ---------- CanRisk (calcul BOADICEA / ovaire / prostate) ---------- */
+
+const CANRISK_URL = (process.env.CANRISK_URL ?? "https://www.canrisk.org").replace(/\/$/, "");
+let canriskToken = process.env.CANRISK_TOKEN ?? "";
+const canriskConfigured = () => !!(canriskToken || (process.env.CANRISK_USERNAME && process.env.CANRISK_PASSWORD));
+
+/** Jeton d'accès : CANRISK_TOKEN, ou obtenu une fois avec l'identifiant et le mot de passe du compte CanRisk. */
+async function getCanRiskToken(): Promise<string> {
+  if (canriskToken) return canriskToken;
+  const r = await fetch(`${CANRISK_URL}/auth-token/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ username: process.env.CANRISK_USERNAME, password: process.env.CANRISK_PASSWORD }),
+  });
+  const data = (await r.json().catch(() => ({}))) as { token?: string };
+  if (!r.ok || !data.token) throw new Error(`Authentification CanRisk refusée (${r.status}) : vérifiez CANRISK_USERNAME / CANRISK_PASSWORD.`);
+  canriskToken = data.token;
+  return canriskToken;
+}
+
+async function handleCanRisk(req: IncomingMessage, res: ServerResponse) {
+  const json = (status: number, body: unknown) => {
+    res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify(body));
+  };
+  if (!canriskConfigured()) return json(503, { detail: "CanRisk non configuré sur le serveur (CANRISK_TOKEN ou CANRISK_USERNAME/CANRISK_PASSWORD dans .env)." });
+  let input: { model?: string; pedigree_data?: string; mut_freq?: string; cancer_rates?: string };
+  try {
+    input = JSON.parse(await readBody(req));
+  } catch {
+    return json(400, { detail: "Requête invalide" });
+  }
+  const model = input.model;
+  if (!model || !["boadicea", "ovarian", "prostate"].includes(model)) return json(400, { detail: "Modèle inconnu" });
+  if (!input.pedigree_data) return json(400, { detail: "Arbre manquant" });
+
+  const body = {
+    mut_freq: input.mut_freq ?? "UK",
+    cancer_rates: input.cancer_rates ?? process.env.CANRISK_CANCER_RATES ?? "UK",
+    pedigree_data: input.pedigree_data,
+    user_id: process.env.CANRISK_USER_ID ?? "genus",
+  };
+  try {
+    const call = async () =>
+      fetch(`${CANRISK_URL}/${model}/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Token ${await getCanRiskToken()}` },
+        body: JSON.stringify(body),
+      });
+    let r = await call();
+    // Jeton expiré : on en redemande un si l'identifiant est configuré
+    if ((r.status === 401 || r.status === 403) && !process.env.CANRISK_TOKEN && process.env.CANRISK_USERNAME) {
+      canriskToken = "";
+      r = await call();
+    }
+    const text = await r.text();
+    let data: unknown;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { detail: text.slice(0, 500) };
+    }
+    if (r.status === 401 || r.status === 403)
+      return json(r.status, {
+        detail: `CanRisk a refusé l'accès (${(data as { detail?: string }).detail ?? r.status}) : vérifiez le jeton ou l'identifiant, et que votre compte a accès aux web-services.`,
+      });
+    json(r.status, data);
+  } catch (e) {
+    console.error(e);
+    json(502, { detail: `Service CanRisk injoignable : ${(e as Error).message}` });
+  }
+}
+
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript",
@@ -107,10 +180,14 @@ function serveStatic(req: IncomingMessage, res: ServerResponse) {
 
 createServer((req, res) => {
   if (req.method === "POST" && req.url === "/api/report") return void handleReport(req, res);
+  if (req.method === "POST" && req.url === "/api/canrisk") return void handleCanRisk(req, res);
   if (req.method === "GET" && req.url === "/api/health")
-    return void res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ ai: !!client, model: MODEL }));
+    return void res
+      .writeHead(200, { "Content-Type": "application/json" })
+      .end(JSON.stringify({ ai: !!client, model: MODEL, canrisk: canriskConfigured() }));
   if (process.env.NODE_ENV === "production" && req.method === "GET") return serveStatic(req, res);
   res.writeHead(404).end();
 }).listen(PORT, () => {
   console.log(`GENUS API sur http://localhost:${PORT} – IA ${client ? `activée (${MODEL})` : "désactivée (pas de clé : mode hors-ligne)"}`);
+  console.log(`CanRisk : ${canriskConfigured() ? `configuré (${CANRISK_URL})` : "non configuré"}`);
 });

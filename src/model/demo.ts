@@ -21,7 +21,7 @@ export function demoPedigree(): Pedigree {
     ageAtDeath: 55,
     fatherId: gpm.id,
     motherId: gmm.id,
-    cancers: [c("sein", 47, "sein gauche, triple négatif")],
+    cancers: [{ ...c("sein", 47, "sein gauche, triple négatif"), pathology: { ER: "N", PR: "N", HER2: "N" } }],
   });
   const auntM = P("F", { label: "Tante mat.", age: 60, fatherId: gpm.id, motherId: gmm.id, cancers: [c("ovaire", 54, "séreux de haut grade")] });
   const auntMhusband = P("M", { label: "Époux tante" });
@@ -33,7 +33,7 @@ export function demoPedigree(): Pedigree {
     age: 39,
     fatherId: father.id,
     motherId: mother.id,
-    cancers: [c("sein", 37, "carcinome canalaire infiltrant, RH+ HER2-")],
+    cancers: [{ ...c("sein", 37, "carcinome canalaire infiltrant, RH+ HER2-"), pathology: { ER: "P", PR: "P", HER2: "N" } }],
   });
   const sister = P("F", { label: "Sœur", age: 35, fatherId: father.id, motherId: mother.id });
   const brother = P("M", { label: "Frère", age: 42, fatherId: father.id, motherId: mother.id });
