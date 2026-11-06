@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  estimateBirthYear,
+  formatCanRiskError,
   pct,
   RISK_LABELS,
   riskKeys,
@@ -17,6 +19,8 @@ interface Props {
   pedigree: Pedigree;
   relations: Record<string, Relation>;
   onEditInfo: (id: string) => void;
+  /** Met à jour une ou plusieurs personnes en une seule étape (annulable d'un coup) */
+  onUpdatePersons: (patches: Record<string, Partial<Person>>) => void;
 }
 
 const TOKEN_KEY = "genus.canriskToken";
@@ -151,7 +155,7 @@ function summary(r: PedigreeResult, res: CanRiskResult, modelLabel: string, targ
   return lines.join("\n");
 }
 
-export function RiskPanel({ pedigree, relations, onEditInfo }: Props) {
+export function RiskPanel({ pedigree, relations, onEditInfo, onUpdatePersons }: Props) {
   const defaultTarget = pedigree.persons[pedigree.probandId]?.sex === "F" ? pedigree.probandId : "";
   const [chosenId, setTargetId] = useState(defaultTarget);
   // Après un changement d'arbre (nouveau, démo, import), la cible revient au cas index
@@ -202,7 +206,10 @@ export function RiskPanel({ pedigree, relations, onEditInfo }: Props) {
       if (!isJson) throw new Error("serveur GENUS absent : le calcul CanRisk n'est pas disponible sur le site statique (voir README).");
       const data = await r.json();
       if (data.expired) logout(); // jeton refusé : on redemande la connexion
-      if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : JSON.stringify(data));
+      if (!r.ok)
+        throw new Error(
+          typeof data.detail === "string" ? data.detail : formatCanRiskError(data, exp.idMap, (id) => label(pedigree.persons[id])),
+        );
       setResult({ data, input: exp.text, model });
       setStatus("idle");
     } catch (e) {
@@ -273,6 +280,58 @@ export function RiskPanel({ pedigree, relations, onEditInfo }: Props) {
           {countRiskFactors(target.riskFactors) ? `${countRiskFactors(target.riskFactors)} renseigné(s)` : "aucun renseigné"}
           {target.ashkenazi ? " · ashkénaze" : ""}{" "}
           <button className="link" onClick={() => onEditInfo(target.id)}>Compléter « Info patient »</button>
+        </div>
+      )}
+
+      {exp.missingYob.length > 0 && (
+        <div className="yob-box">
+          <div className="risk-title">Année de naissance à compléter</div>
+          <div className="muted small">
+            CanRisk en a besoin pour chaque personne atteinte. Si elle est inconnue, une estimation vaut mieux que rien (sinon le risque
+            serait sous-estimé).
+          </div>
+          {exp.missingYob.map((id) => {
+            const p = pedigree.persons[id];
+            const guess = estimateBirthYear(pedigree, id);
+            return (
+              <div key={id} className="yob-row">
+                <span>
+                  {label(p)}
+                  <span className="muted small">
+                    {" "}
+                    ({p.cancers.map((c) => `${c.site} ${c.ageAtDiagnosis ?? "?"}`).join(", ")}
+                    {p.deceased ? `, † ${p.ageAtDeath ?? "?"}` : ""})
+                  </span>
+                </span>
+                <input
+                  type="number"
+                  placeholder={guess ? `≈ ${guess}` : "année"}
+                  onKeyDown={(e) => {
+                    const v = Number((e.target as HTMLInputElement).value);
+                    if (e.key === "Enter" && v > 1800) onUpdatePersons({ [id]: { birthYear: v } });
+                  }}
+                  onBlur={(e) => {
+                    const v = Number(e.target.value);
+                    if (v > 1800) onUpdatePersons({ [id]: { birthYear: v } });
+                  }}
+                />
+              </div>
+            );
+          })}
+          {exp.missingYob.some((id) => estimateBirthYear(pedigree, id)) && (
+            <button
+              onClick={() => {
+                const patches: Record<string, Partial<Person>> = {};
+                for (const id of exp.missingYob) {
+                  const guess = estimateBirthYear(pedigree, id);
+                  if (guess) patches[id] = { birthYear: guess };
+                }
+                onUpdatePersons(patches);
+              }}
+            >
+              Utiliser les estimations (≈)
+            </button>
+          )}
         </div>
       )}
 

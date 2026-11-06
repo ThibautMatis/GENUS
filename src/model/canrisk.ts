@@ -21,6 +21,56 @@ export interface CanRiskExport {
   errors: string[];
   /** Approximations faites lors de l'export */
   warnings: string[];
+  /** Personnes atteintes sans année de naissance (CanRisk l'exige) */
+  missingYob: string[];
+  /** Identifiant CanRisk → identifiant GENUS (pour traduire les messages d'erreur) */
+  idMap: Record<string, string>;
+}
+
+/** Cancers pris en compte par CanRisk */
+const CANRISK_SITES = ["sein", "ovaire", "prostate", "pancréas"];
+
+/**
+ * Estime l'année de naissance d'une personne à partir des apparentés dont elle est connue :
+ * on cherche les plus proches dans l'arbre et on décale de 28 ans par génération.
+ * Le résultat reste compatible avec l'âge au décès et les âges au diagnostic.
+ */
+export function estimateBirthYear(p: Pedigree, id: string): number | undefined {
+  const GEN = 28;
+  const known = (x: Person) => x.birthYear ?? (!x.deceased && x.age != null ? thisYear() - x.age : undefined);
+  const seen = new Map<string, number>([[id, 0]]); // id → décalage de génération
+  let frontier = [id];
+  let estimate: number | undefined;
+  while (frontier.length && estimate === undefined) {
+    const next: string[] = [];
+    const found: number[] = [];
+    for (const cur of frontier) {
+      const g = seen.get(cur)!;
+      const me = p.persons[cur];
+      const neighbours: [string | undefined, number][] = [
+        [me.fatherId, g - 1],
+        [me.motherId, g - 1],
+        ...Object.values(p.persons)
+          .filter((c) => c.fatherId === cur || c.motherId === cur)
+          .map((c): [string, number] => [c.id, g + 1]),
+        ...p.couples.filter((c) => c.a === cur || c.b === cur).map((c): [string, number] => [c.a === cur ? c.b : c.a, g]),
+      ];
+      for (const [n, ng] of neighbours) {
+        if (!n || !p.persons[n] || seen.has(n)) continue;
+        seen.set(n, ng);
+        const y = known(p.persons[n]);
+        if (y !== undefined) found.push(y - ng * GEN);
+        else next.push(n);
+      }
+    }
+    if (found.length) estimate = Math.round(found.reduce((a, b) => a + b, 0) / found.length);
+    frontier = next;
+  }
+  if (estimate === undefined) return undefined;
+  const me = p.persons[id];
+  // Cohérence : né(e) assez tôt pour avoir atteint l'âge au décès et les âges au diagnostic
+  const minAge = Math.max(me.deceased ? (me.ageAtDeath ?? 0) : (me.age ?? 0), ...me.cancers.map((c) => c.ageAtDiagnosis ?? 0));
+  return Math.min(estimate, thisYear() - minAge);
 }
 
 const thisYear = () => new Date().getFullYear();
@@ -90,6 +140,13 @@ export function toCanRisk(p: Pedigree, targetId: string, model: CanRiskModel = "
   // Identifiants courts (7 caractères max)
   const ids = new Map<string, string>();
   persons.forEach((x, i) => ids.set(x.id, String(i + 1)));
+  const missingYob = persons
+    .filter((x) => x.cancers.some((c) => CANRISK_SITES.includes(c.site)) && yobOf(x) === undefined)
+    .map((x) => x.id);
+  if (missingYob.length)
+    errors.push(
+      `CanRisk exige une année de naissance pour chaque personne atteinte d'un cancer (${missingYob.length} manquante${missingYob.length > 1 ? "s" : ""}).`,
+    );
   let extra = persons.length;
   const virtualParents = new Map<string, string>();
   const ignored: string[] = [];
@@ -171,7 +228,8 @@ export function toCanRisk(p: Pedigree, targetId: string, model: CanRiskModel = "
 
   if (ignored.length) warnings.push(`Non pris en compte par CanRisk : ${ignored.join(", ")}.`);
   const header = ["##CanRisk 4.0", ...riskFactorHeader(target?.riskFactors), "##" + COLUMNS.join("\t")];
-  return { text: [...header, ...rows.map((r) => r.join("\t"))].join("\n") + "\n", errors, warnings };
+  const idMap = Object.fromEntries([...ids].map(([personId, crId]) => [crId, personId]));
+  return { text: [...header, ...rows.map((r) => r.join("\t"))].join("\n") + "\n", errors, warnings, missingYob, idMap };
 }
 
 /* ---------- Résultats renvoyés par l'API CanRisk ---------- */
@@ -221,4 +279,19 @@ export const RISK_LABELS: Record<string, string> = {
 export function pct(v: RiskValue | number | undefined): string {
   if (v == null || typeof v === "number") return "–";
   return `${v.percent.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`;
+}
+
+/** Rend lisible un message d'erreur de CanRisk : regroupe les messages et nomme les apparentés. */
+export function formatCanRiskError(data: unknown, idMap: Record<string, string>, nameOf: (personId: string) => string): string {
+  const flatten = (v: unknown): string[] =>
+    typeof v === "string" ? [v] : Array.isArray(v) ? v.flatMap(flatten) : v && typeof v === "object" ? Object.values(v).flatMap(flatten) : [String(v)];
+  return flatten(data)
+    .map((m) =>
+      m
+        .replace(/^\[GENUS\]\s*-\s*/, "")
+        .replace(/(Family member|family member|individual|Individual) "?([A-Za-z0-9]+)"?/g, (all, _w, crId) =>
+          idMap[crId] ? `${all} (${nameOf(idMap[crId])})` : all,
+        ),
+    )
+    .join("\n");
 }

@@ -177,3 +177,7 @@ ul.error, ul.small { margin: 6px 0; padding-left: 18px; }
 .login button.primary { align-self: flex-start; }
 .connected { text-align: right; margin-bottom: 6px; }
 .hint-line { margin: -2px 0 6px; }
+.yob-box { border: 1px solid #f0c36d; background: #fff8e6; border-radius: 8px; padding: 8px 10px; margin: 6px 0 10px; display: flex; flex-direction: column; gap: 6px; }
+.yob-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.yob-row input { width: 110px; flex: none; }
+.yob-box button { align-self: flex-start; }

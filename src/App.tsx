@@ -253,6 +253,9 @@ export default function App() {
               pedigree={pedigree}
               relations={relations}
               onEditInfo={setInfoId}
+              onUpdatePersons={(patches) =>
+                commit(Object.entries(patches).reduce((p, [id, patch]) => updatePerson(p, id, patch), pedigree))
+              }
             />
           </div>
         </aside>
