@@ -107,12 +107,42 @@ async function getCanRiskToken(): Promise<string> {
   return canriskToken;
 }
 
+/** Connexion : échange identifiant + mot de passe CanRisk contre un jeton. Le mot de passe n'est ni stocké ni journalisé. */
+async function handleCanRiskLogin(req: IncomingMessage, res: ServerResponse) {
+  const json = (status: number, body: unknown) => {
+    res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify(body));
+  };
+  let username = "";
+  let password = "";
+  try {
+    ({ username, password } = JSON.parse(await readBody(req, 10_000)));
+  } catch {
+    return json(400, { detail: "Requête invalide" });
+  }
+  if (!username || !password) return json(400, { detail: "Identifiant et mot de passe requis." });
+  try {
+    const r = await fetch(`${CANRISK_URL}/auth-token/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = (await r.json().catch(() => ({}))) as { token?: string };
+    if (!r.ok || !data.token) return json(401, { detail: "Identifiant ou mot de passe CanRisk incorrect." });
+    json(200, { token: data.token });
+  } catch (e) {
+    json(502, { detail: `Service CanRisk injoignable : ${(e as Error).message}` });
+  }
+}
+
 async function handleCanRisk(req: IncomingMessage, res: ServerResponse) {
   const json = (status: number, body: unknown) => {
     res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     res.end(JSON.stringify(body));
   };
-  if (!canriskConfigured()) return json(503, { detail: "CanRisk non configuré sur le serveur (CANRISK_TOKEN ou CANRISK_USERNAME/CANRISK_PASSWORD dans .env)." });
+  // Jeton de l'utilisateur connecté (envoyé par le navigateur), sinon compte configuré sur le serveur
+  const userToken = typeof req.headers["x-canrisk-token"] === "string" ? req.headers["x-canrisk-token"] : "";
+  if (!userToken && !canriskConfigured()) return json(401, { detail: "Connectez-vous à CanRisk (identifiant et mot de passe de votre compte canrisk.org)." });
   let input: { model?: string; pedigree_data?: string; mut_freq?: string; cancer_rates?: string };
   try {
     input = JSON.parse(await readBody(req));
@@ -133,12 +163,12 @@ async function handleCanRisk(req: IncomingMessage, res: ServerResponse) {
     const call = async () =>
       fetch(`${CANRISK_URL}/${model}/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Token ${await getCanRiskToken()}` },
+        headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Token ${userToken || (await getCanRiskToken())}` },
         body: JSON.stringify(body),
       });
     let r = await call();
     // Jeton expiré : on en redemande un si l'identifiant est configuré
-    if ((r.status === 401 || r.status === 403) && !process.env.CANRISK_TOKEN && process.env.CANRISK_USERNAME) {
+    if ((r.status === 401 || r.status === 403) && !userToken && !process.env.CANRISK_TOKEN && process.env.CANRISK_USERNAME) {
       canriskToken = "";
       r = await call();
     }
@@ -151,7 +181,8 @@ async function handleCanRisk(req: IncomingMessage, res: ServerResponse) {
     }
     if (r.status === 401 || r.status === 403)
       return json(r.status, {
-        detail: `CanRisk a refusé l'accès (${(data as { detail?: string }).detail ?? r.status}) : vérifiez le jeton ou l'identifiant, et que votre compte a accès aux web-services.`,
+        detail: `CanRisk a refusé l'accès (${(data as { detail?: string }).detail ?? r.status}). Reconnectez-vous ; si le problème persiste, vérifiez auprès de CanRisk que votre compte a accès aux web-services.`,
+        expired: !!userToken,
       });
     json(r.status, data);
   } catch (e) {
@@ -181,6 +212,7 @@ function serveStatic(req: IncomingMessage, res: ServerResponse) {
 createServer((req, res) => {
   if (req.method === "POST" && req.url === "/api/report") return void handleReport(req, res);
   if (req.method === "POST" && req.url === "/api/canrisk") return void handleCanRisk(req, res);
+  if (req.method === "POST" && req.url === "/api/canrisk/login") return void handleCanRiskLogin(req, res);
   if (req.method === "GET" && req.url === "/api/health")
     return void res
       .writeHead(200, { "Content-Type": "application/json" })

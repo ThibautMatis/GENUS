@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   pct,
   RISK_LABELS,
@@ -17,6 +17,73 @@ interface Props {
   pedigree: Pedigree;
   relations: Record<string, Relation>;
   onEditInfo: (id: string) => void;
+}
+
+const TOKEN_KEY = "genus.canriskToken";
+const loadToken = () => {
+  try {
+    return localStorage.getItem(TOKEN_KEY) ?? "";
+  } catch {
+    return "";
+  }
+};
+const saveToken = (t: string) => {
+  try {
+    if (t) localStorage.setItem(TOKEN_KEY, t);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* stockage indisponible */
+  }
+};
+
+/** Connexion au compte CanRisk de l'utilisateur. */
+function CanRiskLogin({ onToken }: { onToken: (t: string) => void }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const r = await fetch("api/canrisk/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      if (!r.headers.get("content-type")?.includes("json")) throw new Error("serveur GENUS absent : la connexion à CanRisk n'est pas possible sur le site statique.");
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail ?? `erreur ${r.status}`);
+      onToken(data.token);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+      setPassword("");
+    }
+  };
+  return (
+    <form className="login" onSubmit={submit}>
+      <div className="risk-title">Connexion à votre compte CanRisk</div>
+      <div className="muted small">Une seule fois sur ce navigateur. Le mot de passe n'est pas conservé.</div>
+      <div className="row">
+        <label>
+          Identifiant
+          <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
+        </label>
+        <label>
+          Mot de passe
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
+        </label>
+      </div>
+      <button className="primary" type="submit" disabled={busy || !username || !password}>{busy ? "Connexion…" : "Se connecter"}</button>
+      {error && <div className="error">{error}</div>}
+      <div className="muted small">
+        Pas de compte ? <a href="https://www.canrisk.org/accounts/register/" target="_blank" rel="noreferrer">Créer un compte sur canrisk.org</a>
+      </div>
+    </form>
+  );
 }
 
 const MODELS: { key: CanRiskModel; label: string }[] = [
@@ -95,6 +162,21 @@ export function RiskPanel({ pedigree, relations, onEditInfo }: Props) {
   const [error, setError] = useState("");
   const [result, setResult] = useState<{ data: CanRiskResult; input: string; model: CanRiskModel } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [token, setToken] = useState(loadToken);
+  // Compte CanRisk configuré directement sur le serveur (fichier .env) : pas besoin de connexion
+  const [serverAccount, setServerAccount] = useState(false);
+  useEffect(() => {
+    fetch("api/health")
+      .then((r) => r.json())
+      .then((h) => setServerAccount(!!h.canrisk))
+      .catch(() => {});
+  }, []);
+  const connected = !!token || serverAccount;
+  const logout = () => {
+    saveToken("");
+    setToken("");
+    setResult(null);
+  };
 
   const target = pedigree.persons[targetId];
   const exp = useMemo(() => toCanRisk(pedigree, targetId, model), [pedigree, targetId, model]);
@@ -113,12 +195,13 @@ export function RiskPanel({ pedigree, relations, onEditInfo }: Props) {
     try {
       const r = await fetch("api/canrisk", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(token ? { "X-CanRisk-Token": token } : {}) },
         body: JSON.stringify({ model, pedigree_data: exp.text, cancer_rates: rates, mut_freq: "UK" }),
       });
       const isJson = r.headers.get("content-type")?.includes("json");
       if (!isJson) throw new Error("serveur GENUS absent : le calcul CanRisk n'est pas disponible sur le site statique (voir README).");
       const data = await r.json();
+      if (data.expired) logout(); // jeton refusé : on redemande la connexion
       if (!r.ok) throw new Error(typeof data.detail === "string" ? data.detail : JSON.stringify(data));
       setResult({ data, input: exp.text, model });
       setStatus("idle");
@@ -146,6 +229,20 @@ export function RiskPanel({ pedigree, relations, onEditInfo }: Props) {
 
   return (
     <div className="panel risk-panel">
+      {!connected ? (
+        <CanRiskLogin
+          onToken={(t) => {
+            saveToken(t);
+            setToken(t);
+          }}
+        />
+      ) : (
+        token && (
+          <div className="muted small connected">
+            Connecté à CanRisk · <button className="link" onClick={logout}>Se déconnecter</button>
+          </div>
+        )
+      )}
       <div className="row">
         <label>
           Modèle
@@ -191,7 +288,7 @@ export function RiskPanel({ pedigree, relations, onEditInfo }: Props) {
       )}
 
       <div className="actions">
-        <button className="primary" onClick={run} disabled={!!exp.errors.length || status === "loading"}>
+        <button className="primary" onClick={run} disabled={!connected || !!exp.errors.length || status === "loading"}>
           {status === "loading" ? "Calcul en cours…" : "Calculer le risque"}
         </button>
         <button onClick={download} disabled={!!exp.errors.length} title="Fichier importable dans l'outil CanRisk (canrisk.org)">Fichier CanRisk</button>

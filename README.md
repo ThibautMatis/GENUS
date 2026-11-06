@@ -53,12 +53,9 @@ risque cumulé de 20 à 80 ans, risque entre 40 et 50 ans, risque à partir de l
 - Bouton « Fichier CanRisk » : le même fichier, importable dans l'outil web canrisk.org pour contrôle.
 - Bouton « Copier pour le CR » : résumé des résultats à coller dans le compte rendu.
 
-**Configuration** (dans `.env`) : un compte sur https://www.canrisk.org, avec accès aux web-services.
+**Connexion** : chaque utilisateur se connecte une fois avec **son propre compte canrisk.org** (identifiant + mot de passe) dans l'onglet Risque CanRisk. Le mot de passe n'est pas conservé : GENUS garde seulement le jeton d'accès renvoyé par CanRisk, dans le navigateur. Bouton « Se déconnecter » pour l'effacer.
 
-```
-CANRISK_USERNAME=...
-CANRISK_PASSWORD=...
-```
+Optionnel, pour un poste de test : un compte unique peut être configuré côté serveur dans `.env` (`CANRISK_USERNAME` / `CANRISK_PASSWORD`) ; la connexion n'est alors plus demandée.
 
 Le calcul nécessite le **serveur GENUS** (`npm run dev` ou `npm start`) : l'API CanRisk n'accepte pas les appels directs depuis un navigateur (pas de CORS), donc il n'est pas disponible sur la version GitHub Pages.
 
