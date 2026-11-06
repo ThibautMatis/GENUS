@@ -10,12 +10,13 @@ import {
   type RiskRow,
 } from "../model/canrisk";
 import type { Relation } from "../model/relations";
-import type { Pedigree, Person, RiskFactors } from "../model/types";
+import type { Pedigree, Person } from "../model/types";
+import { countRiskFactors } from "./PatientInfoModal";
 
 interface Props {
   pedigree: Pedigree;
   relations: Record<string, Relation>;
-  onUpdatePerson: (id: string, patch: Partial<Person>) => void;
+  onEditInfo: (id: string) => void;
 }
 
 const MODELS: { key: CanRiskModel; label: string }[] = [
@@ -24,7 +25,6 @@ const MODELS: { key: CanRiskModel; label: string }[] = [
   { key: "prostate", label: "Prostate" },
 ];
 
-const numOrUndef = (v: string) => (v === "" ? undefined : Number(v));
 
 function RiskTable({ title, rows, baseline }: { title: string; rows?: RiskRow[]; baseline?: RiskRow[] }) {
   if (!rows?.length) return null;
@@ -84,9 +84,11 @@ function summary(r: PedigreeResult, res: CanRiskResult, modelLabel: string, targ
   return lines.join("\n");
 }
 
-export function RiskPanel({ pedigree, relations, onUpdatePerson }: Props) {
+export function RiskPanel({ pedigree, relations, onEditInfo }: Props) {
   const defaultTarget = pedigree.persons[pedigree.probandId]?.sex === "F" ? pedigree.probandId : "";
-  const [targetId, setTargetId] = useState(defaultTarget);
+  const [chosenId, setTargetId] = useState(defaultTarget);
+  // Après un changement d'arbre (nouveau, démo, import), la cible revient au cas index
+  const targetId = pedigree.persons[chosenId] ? chosenId : defaultTarget;
   const [model, setModel] = useState<CanRiskModel>("boadicea");
   const [rates, setRates] = useState("UK");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -98,8 +100,6 @@ export function RiskPanel({ pedigree, relations, onUpdatePerson }: Props) {
   const exp = useMemo(() => toCanRisk(pedigree, targetId, model), [pedigree, targetId, model]);
   const stale = result && result.input !== exp.text;
   const pr = result?.data.pedigree_result?.[0];
-  const rf = target?.riskFactors ?? {};
-  const setRf = (patch: Partial<RiskFactors>) => target && onUpdatePerson(target.id, { riskFactors: { ...rf, ...patch } });
 
   const candidates = Object.values(pedigree.persons).filter((p) => !p.deceased && (model === "prostate" ? p.sex === "M" : p.sex === "F"));
   const label = (p: Person) => {
@@ -170,55 +170,13 @@ export function RiskPanel({ pedigree, relations, onUpdatePerson }: Props) {
         </label>
       </div>
 
-      {target && model !== "prostate" && (
-        <details className="rf">
-          <summary>Facteurs de risque de la personne (optionnels)</summary>
-          <div className="rf-grid">
-            <label>Âge des 1res règles<input type="number" value={rf.menarche ?? ""} onChange={(e) => setRf({ menarche: numOrUndef(e.target.value) })} /></label>
-            <label>Nombre d'enfants<input type="number" value={rf.parity ?? ""} onChange={(e) => setRf({ parity: numOrUndef(e.target.value) })} /></label>
-            <label>Âge au 1er enfant<input type="number" value={rf.firstLiveBirth ?? ""} onChange={(e) => setRf({ firstLiveBirth: numOrUndef(e.target.value) })} /></label>
-            <label>Ménopause (âge, ou N)<input value={rf.menopause ?? ""} onChange={(e) => setRf({ menopause: e.target.value || undefined })} placeholder="N = non ménopausée" /></label>
-            <label>Contraception orale<input value={rf.ocUse ?? ""} onChange={(e) => setRf({ ocUse: e.target.value || undefined })} placeholder="N, F:5, C:3" title="N = jamais ; F:années = ancienne ; C:années = actuelle" /></label>
-            <label>
-              THM
-              <select value={rf.mhtUse ?? ""} onChange={(e) => setRf({ mhtUse: (e.target.value || undefined) as RiskFactors["mhtUse"] })}>
-                <option value="">—</option>
-                <option value="N">Jamais</option>
-                <option value="F">Ancien</option>
-                <option value="E">Actuel (œstrogènes seuls)</option>
-                <option value="C">Actuel (autre / combiné)</option>
-              </select>
-            </label>
-            <label>IMC<input type="number" step="0.1" value={rf.bmi ?? ""} onChange={(e) => setRf({ bmi: numOrUndef(e.target.value) })} /></label>
-            <label>Taille (cm)<input type="number" value={rf.height ?? ""} onChange={(e) => setRf({ height: numOrUndef(e.target.value) })} /></label>
-            <label>Alcool (g/j)<input type="number" step="0.1" value={rf.alcohol ?? ""} onChange={(e) => setRf({ alcohol: numOrUndef(e.target.value) })} /></label>
-            <label>
-              Densité (BI-RADS)
-              <select value={rf.birads ?? ""} onChange={(e) => setRf({ birads: (e.target.value || undefined) as RiskFactors["birads"] })}>
-                <option value="">—</option>
-                {["a", "b", "c", "d"].map((x) => (
-                  <option key={x}>{x}</option>
-                ))}
-              </select>
-            </label>
-            {model === "ovarian" && (
-              <>
-                <label>
-                  Ligature des trompes
-                  <select value={rf.tubalLigation ?? ""} onChange={(e) => setRf({ tubalLigation: (e.target.value || undefined) as "Y" | "N" })}>
-                    <option value="">—</option><option value="Y">Oui</option><option value="N">Non</option>
-                  </select>
-                </label>
-                <label>
-                  Endométriose
-                  <select value={rf.endometriosis ?? ""} onChange={(e) => setRf({ endometriosis: (e.target.value || undefined) as "Y" | "N" })}>
-                    <option value="">—</option><option value="Y">Oui</option><option value="N">Non</option>
-                  </select>
-                </label>
-              </>
-            )}
-          </div>
-        </details>
+      {target && (
+        <div className="rf-summary small">
+          Facteurs de risque{target.id === pedigree.probandId ? "" : ` (${label(target)})`} :{" "}
+          {countRiskFactors(target.riskFactors) ? `${countRiskFactors(target.riskFactors)} renseigné(s)` : "aucun renseigné"}
+          {target.ashkenazi ? " · ashkénaze" : ""}{" "}
+          <button className="link" onClick={() => onEditInfo(target.id)}>Compléter « Info patient »</button>
+        </div>
       )}
 
       {exp.errors.length > 0 && (

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PedigreeView } from "./components/PedigreeView";
 import { PersonPanel, type Action } from "./components/PersonPanel";
 import { ReportPanel } from "./components/ReportPanel";
+import { PatientInfoModal } from "./components/PatientInfoModal";
 import { RiskPanel } from "./components/RiskPanel";
 import { layout } from "./layout";
 import { CANCER_SITES } from "./model/cancers";
@@ -39,6 +40,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | undefined>(() => pedigree.probandId);
   const [zoom, setZoom] = useState(1);
   const [tab, setTab] = useState<"report" | "risk">("report");
+  const [infoId, setInfoId] = useState<string | undefined>();
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const laid = useMemo(() => layout(pedigree), [pedigree]);
@@ -190,6 +192,7 @@ export default function App() {
           <input value={pedigree.consultation.origins ?? ""} onChange={(e) => setConsult({ origins: e.target.value })} placeholder="ex. ashkénaze" />
         </label>
         <div className="toolbar">
+          <button className="primary" onClick={() => setInfoId(pedigree.probandId)} title="Facteurs de risque, origine… (utilisés par CanRisk)">Info patient</button>
           <button onClick={undo} disabled={!history.length} title="Annuler (Ctrl+Z)">↶ Annuler</button>
           <button onClick={() => confirm("Commencer un nouvel arbre ? L'arbre actuel sera remplacé.") && reset(emptyPedigree())}>Nouveau</button>
           <button onClick={() => confirm("Charger la famille de démonstration ?") && reset(demoPedigree())}>Démo</button>
@@ -249,11 +252,19 @@ export default function App() {
             <RiskPanel
               pedigree={pedigree}
               relations={relations}
-              onUpdatePerson={(id, patch) => commit(updatePerson(pedigree, id, patch), true)}
+              onEditInfo={setInfoId}
             />
           </div>
         </aside>
       </main>
+      {infoId && pedigree.persons[infoId] && (
+        <PatientInfoModal
+          person={pedigree.persons[infoId]}
+          title={infoId === pedigree.probandId ? "Cas index" : (relations[infoId]?.label ?? "")}
+          onChange={(patch) => commit(updatePerson(pedigree, infoId, patch), true)}
+          onClose={() => setInfoId(undefined)}
+        />
+      )}
     </div>
   );
 }
