@@ -176,3 +176,4 @@ ul.error, ul.small { margin: 6px 0; padding-left: 18px; }
 .login { background: var(--bg); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
 .login button.primary { align-self: flex-start; }
 .connected { text-align: right; margin-bottom: 6px; }
+.hint-line { margin: -2px 0 6px; }

@@ -1,9 +1,11 @@
-import { newPerson, uid } from "./ops";
+import { currentYear, newPerson, uid } from "./ops";
 import type { Pedigree, Person } from "./types";
 
 /** Famille FICTIVE de démonstration (contexte sein-ovaire). */
 export function demoPedigree(): Pedigree {
-  const P = (sex: Person["sex"], extra: Partial<Person> = {}) => newPerson(sex, extra);
+  // L'année de naissance est déduite de l'âge, comme lors de la saisie
+  const P = (sex: Person["sex"], extra: Partial<Person> = {}) =>
+    newPerson(sex, { ...extra, ...(extra.age != null && !extra.birthYear ? { birthYear: currentYear() - extra.age } : {}) });
   const c = (site: string, ageAtDiagnosis?: number, details?: string) => ({ id: uid(), site, ageAtDiagnosis, details });
 
   // Grands-parents

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { agePatch, birthYearPatch } from "../model/ops";
 import type { Person, RiskFactors } from "../model/types";
 
 interface Props {
@@ -54,8 +55,12 @@ export function PatientInfoModal({ person, title, onChange, onClose }: Props) {
                 <input
                   type="number"
                   value={(person.deceased ? person.ageAtDeath : person.age) ?? ""}
-                  onChange={(e) => onChange(person.deceased ? { ageAtDeath: num(e.target.value) } : { age: num(e.target.value) })}
+                  onChange={(e) => onChange(person.deceased ? { ageAtDeath: num(e.target.value) } : agePatch(person, num(e.target.value)))}
                 />
+              </label>
+              <label>
+                Année de naissance
+                <input type="number" value={person.birthYear ?? ""} onChange={(e) => onChange(birthYearPatch(person, num(e.target.value)))} />
               </label>
               <label>Taille (cm)<input type="number" value={rf.height ?? ""} onChange={(e) => set({ height: num(e.target.value) })} /></label>
               <label>IMC (kg/m²)<input type="number" step="0.1" value={rf.bmi ?? ""} onChange={(e) => set({ bmi: num(e.target.value) })} /></label>

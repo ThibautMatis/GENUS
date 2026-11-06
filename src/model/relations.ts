@@ -65,8 +65,11 @@ function bloodRelation(p: Pedigree, id: string, probandUp: Map<string, Up>): Rel
   const { a, b } = best;
   // Une seule branche si tous les ancêtres communs les plus proches sont du même côté (sinon : fratrie, descendance…)
   const side = sides.size === 1 ? [...sides][0] : undefined;
-  const degree = a + b;
   const half = commonAtBest === 1 && a >= 1 && b >= 1;
+  // Degré de parenté génétique : ligne directe = nombre de générations ;
+  // collatéraux par les deux parents communs = a + b − 1 (fratrie 1er, oncle/tante 2e, cousin germain 3e) ;
+  // demi-collatéraux (un seul ancêtre commun) = a + b (demi-frère 2e…).
+  const degree = a === 0 || b === 0 || half ? a + b : a + b - 1;
   const demi = half ? "demi-" : "";
   const S = sideAdj(sex, side);
   let label: string;

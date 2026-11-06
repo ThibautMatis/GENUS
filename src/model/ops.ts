@@ -1,5 +1,28 @@
 import type { Couple, Pedigree, Person, Sex } from "./types";
 
+export const currentYear = () => new Date().getFullYear();
+
+const validYear = (y?: number) => y != null && y >= 1850 && y <= currentYear();
+
+/**
+ * Saisie de l'âge : l'année de naissance est proposée automatiquement (année en cours − âge)
+ * si elle est vide ou si elle avait elle-même été calculée à partir de l'âge précédent.
+ * Une année saisie à la main n'est jamais écrasée.
+ */
+export function agePatch(p: Person, age?: number): Partial<Person> {
+  const y = currentYear();
+  const auto = !validYear(p.birthYear) || (p.age != null && p.birthYear === y - p.age);
+  return auto ? { age, birthYear: age == null ? undefined : y - age } : { age };
+}
+
+/** Saisie de l'année de naissance : l'âge est proposé de la même façon (personne vivante). */
+export function birthYearPatch(p: Person, birthYear?: number): Partial<Person> {
+  const y = currentYear();
+  if (p.deceased || !validYear(birthYear)) return { birthYear };
+  const auto = p.age == null || !validYear(p.birthYear) || p.age === y - p.birthYear!;
+  return auto ? { birthYear, age: y - birthYear! } : { birthYear };
+}
+
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
 export function newPerson(sex: Sex, extra: Partial<Person> = {}): Person {

@@ -1,5 +1,5 @@
 import { CANCER_SITES } from "../model/cancers";
-import { uid } from "../model/ops";
+import { agePatch, birthYearPatch, currentYear, uid } from "../model/ops";
 import { degreeLabel, type Relation } from "../model/relations";
 import type { Cancer, GeneticTest, Person, Sex, TestResult } from "../model/types";
 
@@ -103,18 +103,24 @@ export function PersonPanel({ person, relation, isProband, onChange, onAction }:
               </label>
             </>
           ) : (
-            <>
-              <label>
-                Âge
-                <input type="number" min={0} value={person.age ?? ""} onChange={(e) => onChange({ age: num(e.target.value) })} />
-              </label>
-              <label>
-                Année de naissance
-                <input type="number" value={person.birthYear ?? ""} onChange={(e) => onChange({ birthYear: num(e.target.value) })} />
-              </label>
-            </>
+            <label>
+              Âge
+              <input type="number" min={0} value={person.age ?? ""} onChange={(e) => onChange(agePatch(person, num(e.target.value)))} />
+            </label>
           )}
+          <label>
+            Année de naissance
+            <input
+              type="number"
+              value={person.birthYear ?? ""}
+              placeholder={person.deceased ? "si connue" : "calculée depuis l'âge"}
+              onChange={(e) => onChange(birthYearPatch(person, num(e.target.value)))}
+            />
+          </label>
         </div>
+        {!person.deceased && person.age != null && person.birthYear === currentYear() - person.age && (
+          <div className="muted small hint-line">Année de naissance déduite de l'âge (à ± 1 an près selon la date d'anniversaire).</div>
+        )}
       </fieldset>
 
       <fieldset>
